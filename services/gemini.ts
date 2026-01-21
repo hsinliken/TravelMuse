@@ -69,14 +69,24 @@ export const refineParagraph = async (currentContent: string, focus: string, ton
 
 /**
  * 生成影像
- * 修正：針對 nano banana 系列 (2.5-flash-image) 不可設定 responseMimeType 或 responseSchema
+ * 修正：根據 guidelines，imageSize 僅可用於 gemini-3-pro-image-preview。
+ * 針對 nano banana (2.5-flash-image) 設定 imageSize 會導致 400 INVALID_ARGUMENT。
  */
 export const generateAIImage = async (prompt: string, modelName: string = 'gemini-2.5-flash-image') => {
   const imageAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const isPro = modelName.includes('pro');
   
-  // 重要：影像生成模型只接受特定的 config
+  // 建立基礎配置
+  const imageConfig: any = {
+    aspectRatio: "16:9"
+  };
+
+  // 僅在 Pro 模型下添加 imageSize
+  if (isPro) {
+    imageConfig.imageSize = "4K";
+  }
+
   const response = await imageAi.models.generateContent({
     model: modelName,
     contents: {
@@ -85,11 +95,7 @@ export const generateAIImage = async (prompt: string, modelName: string = 'gemin
       ]
     },
     config: {
-      imageConfig: {
-        aspectRatio: "16:9",
-        imageSize: isPro ? "4K" : "1K"
-      }
-      // 注意：此處嚴禁出現 responseMimeType，否則會觸發 400 INVALID_ARGUMENT
+      imageConfig: imageConfig
     }
   });
 
