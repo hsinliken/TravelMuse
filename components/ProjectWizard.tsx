@@ -19,10 +19,13 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
   const [keyError, setKeyError] = useState(false);
 
   const handleStart = async () => {
-    // 1. 環境檢測：如果 API_KEY 變數為空，說明需要手動授權
-    if (window.aistudio && (!process.env.API_KEY || process.env.API_KEY.trim() === "")) {
+    // 安全地檢查 API Key，避免因為 process.env 未定義或 API_KEY 為空而崩潰
+    const apiKey = typeof process !== 'undefined' ? process.env?.API_KEY : undefined;
+
+    if (window.aistudio && !apiKey) {
+      console.log("Missing API Key, prompting user...");
       await window.aistudio.openSelectKey();
-      // 點擊後不中斷流程，嘗試繼續，系統會自動在背景注入 key
+      // 根據規範，呼叫後直接嘗試繼續，系統會自動處理 key 的注入
     }
 
     setKeyError(false);
@@ -32,7 +35,7 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
       const template = templates.find(t => t.id === selectedTemplateId);
       const tone = isCustomStyle ? customToneInput : (template ? template.name : '標準商務行銷');
       
-      // 呼叫 API
+      // 執行 API
       const data = await generateTravelPlan(destination, tone);
       
       const sections = data.sections || [];
@@ -57,11 +60,11 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
       
       onComplete(newProject);
     } catch (error: any) {
-      console.error("Detailed Error:", error);
+      console.error("Project Generation Detailed Error:", error);
       
-      // 2. 錯誤捕捉：如果報錯中提到 API Key，引導使用者重新選取
       const errorMsg = error?.message || "";
-      if (errorMsg.includes("API Key") || errorMsg.includes("403") || errorMsg.includes("401")) {
+      // 捕捉金鑰相關錯誤
+      if (errorMsg.includes("API Key") || errorMsg.includes("403") || errorMsg.includes("401") || errorMsg.includes("process is not defined")) {
         setKeyError(true);
         if (window.aistudio) {
           await window.aistudio.openSelectKey();
@@ -174,7 +177,7 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
               {keyError && (
                 <div className="bg-amber-50 p-4 rounded-2xl flex items-center gap-3 text-amber-700 text-xs text-left max-w-md mx-auto border border-amber-100 animate-in slide-in-from-top-2">
                   <Key size={16} className="shrink-0" />
-                  <p>偵測到 API Key 無法讀取。請點擊下方按鈕選取一個<b>已啟用付費專案（Paid Project）</b>的金鑰以繼續使用。</p>
+                  <p>偵測到 API Key 無法讀取或授權失效。請點擊下方按鈕選取一個<b>已啟用付費專案（Paid Project）</b>的金鑰以繼續使用。</p>
                 </div>
               )}
 
@@ -184,7 +187,7 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
                   onClick={handleStart}
                   className="bg-stone-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-stone-800 transition-all shadow-lg disabled:opacity-70"
                 >
-                  {loading ? '正在分析內容構想...' : keyError ? '點此選取金鑰並重試' : '確認並開始生成'} 
+                  {loading ? '正在分析內容構想...' : keyError ? '點此開啟選取視窗並重試' : '確認並開始生成'} 
                 </button>
                 <button 
                   disabled={loading}
