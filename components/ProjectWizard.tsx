@@ -19,25 +19,20 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
   const [keyError, setKeyError] = useState(false);
 
   const handleStart = async () => {
-    // 強制重設錯誤狀態
+    // 1. 環境檢測：如果 API_KEY 變數為空，說明需要手動授權
+    if (window.aistudio && (!process.env.API_KEY || process.env.API_KEY.trim() === "")) {
+      await window.aistudio.openSelectKey();
+      // 點擊後不中斷流程，嘗試繼續，系統會自動在背景注入 key
+    }
+
     setKeyError(false);
     setLoading(true);
 
     try {
-      // 1. 如果是在 AI Studio 環境且當前金鑰疑似無效，主動觸發選取器
-      if (window.aistudio) {
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        // 如果沒有 key 或處於 error 狀態重試，則彈出視窗
-        if (!hasKey || !process.env.API_KEY) {
-          await window.aistudio.openSelectKey();
-          // 根據規則：觸發後直接繼續，不等待
-        }
-      }
-
       const template = templates.find(t => t.id === selectedTemplateId);
       const tone = isCustomStyle ? customToneInput : (template ? template.name : '標準商務行銷');
       
-      // 2. 呼叫 API (此處會拋出 "API Key must be set" 若 key 仍為空)
+      // 呼叫 API
       const data = await generateTravelPlan(destination, tone);
       
       const sections = data.sections || [];
@@ -62,21 +57,17 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
       
       onComplete(newProject);
     } catch (error: any) {
-      console.error("Project Generation Error:", error);
+      console.error("Detailed Error:", error);
       
-      // 3. 攔截 API Key 錯誤並更新 UI
-      if (
-        error?.message?.includes("API Key must be set") || 
-        error?.message?.includes("Requested entity was not found") ||
-        error?.message?.includes("API_KEY")
-      ) {
+      // 2. 錯誤捕捉：如果報錯中提到 API Key，引導使用者重新選取
+      const errorMsg = error?.message || "";
+      if (errorMsg.includes("API Key") || errorMsg.includes("403") || errorMsg.includes("401")) {
         setKeyError(true);
-        // 如果報錯了，再次嘗試開啟選取器引導使用者
         if (window.aistudio) {
           await window.aistudio.openSelectKey();
         }
       } else {
-        alert("生成文案時發生錯誤，請確認網路連線或金鑰權限後再試。");
+        alert("生成文案時發生錯誤。請確認您的 API Key 已啟用付費專案且網路連線正常。");
       }
     } finally {
       setLoading(false);
@@ -181,9 +172,9 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
               </div>
 
               {keyError && (
-                <div className="bg-amber-50 p-4 rounded-2xl flex items-center gap-3 text-amber-700 text-xs text-left max-w-md mx-auto border border-amber-100 animate-in fade-in slide-in-from-top-2">
+                <div className="bg-amber-50 p-4 rounded-2xl flex items-center gap-3 text-amber-700 text-xs text-left max-w-md mx-auto border border-amber-100 animate-in slide-in-from-top-2">
                   <Key size={16} className="shrink-0" />
-                  <p>偵測到 API Key 讀取失敗。若您在 AI Studio 預覽，請點擊下方按鈕手動授權金鑰以繼續。</p>
+                  <p>偵測到 API Key 無法讀取。請點擊下方按鈕選取一個<b>已啟用付費專案（Paid Project）</b>的金鑰以繼續使用。</p>
                 </div>
               )}
 
@@ -193,7 +184,7 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
                   onClick={handleStart}
                   className="bg-stone-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-stone-800 transition-all shadow-lg disabled:opacity-70"
                 >
-                  {loading ? '正在分析內容構想...' : keyError ? '點此重新授權金鑰並重試' : '確認並開始生成'} 
+                  {loading ? '正在分析內容構想...' : keyError ? '點此選取金鑰並重試' : '確認並開始生成'} 
                 </button>
                 <button 
                   disabled={loading}

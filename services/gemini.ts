@@ -1,6 +1,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const generateTravelPlan = async (destination: string, tone: string) => {
+  // 必須在函式內部實例化
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const response = await ai.models.generateContent({
@@ -42,7 +43,6 @@ export const generateTravelPlan = async (destination: string, tone: string) => {
 
 export const refineParagraph = async (currentContent: string, focus: string, tone: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `優化旅遊文案。重點：${focus}。品牌風格：${tone}。原文： "${currentContent}"。請使用繁體中文。`,
@@ -52,43 +52,28 @@ export const refineParagraph = async (currentContent: string, focus: string, ton
 
 export const generateAIImage = async (prompt: string, modelName: string = 'gemini-2.5-flash-image') => {
   const imageAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const isPro = modelName.includes('pro');
-  
-  const imageConfig: any = {
-    aspectRatio: "16:9"
-  };
-
-  if (isPro) {
-    imageConfig.imageSize = "4K";
-  }
+  const imageConfig: any = { aspectRatio: "16:9" };
+  if (isPro) imageConfig.imageSize = "4K";
 
   try {
     const response = await imageAi.models.generateContent({
       model: modelName,
       contents: { parts: [{ text: prompt }] },
-      config: {
-        imageConfig: imageConfig
-      }
+      config: { imageConfig: imageConfig }
     });
-
     if (!response.candidates?.[0]?.content?.parts) return null;
-
     for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
+      if (part.inlineData) return `data:image/png;base64,${part.inlineData.data}`;
     }
     return null;
   } catch (error) {
-    console.error("Image generation failed", error);
     throw error;
   }
 };
 
 export const analyzeImage = async (base64Image: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: {
@@ -103,7 +88,6 @@ export const analyzeImage = async (base64Image: string) => {
 
 export const generateImagePrompt = async (text: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `根據這段文案撰寫一段適合 AI 繪圖的英文 Prompt： "${text}"。只回傳 Prompt 內容文字。`
