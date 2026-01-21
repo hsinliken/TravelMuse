@@ -1,9 +1,10 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
-import { ToneType } from "../types";
 
 export const generateTravelPlan = async (destination: string, tone: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) throw new Error("API Key is missing");
+  const ai = new GoogleGenAI({ apiKey });
+  
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: `請為「${destination}」創作深度行銷文案。品牌風格要求：${tone}。必須使用繁體中文。總共 4 個區塊。`,
@@ -33,26 +34,34 @@ export const generateTravelPlan = async (destination: string, tone: string) => {
   });
   
   try {
-    return JSON.parse(response.text || '{}');
+    const text = response.text || '{}';
+    return JSON.parse(text);
   } catch (error) {
+    console.error("JSON Parsing Error", error);
     return { title: destination, sections: [] };
   }
 };
 
 export const refineParagraph = async (currentContent: string, focus: string, tone: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) throw new Error("API Key is missing");
+  const ai = new GoogleGenAI({ apiKey });
+  
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `優化文案。重點：${focus}。品牌風格：${tone}。原文： "${currentContent}"。繁體中文。`,
+    contents: `優化旅遊文案。重點：${focus}。品牌風格：${tone}。原文： "${currentContent}"。請使用繁體中文。`,
   });
   return response.text;
 };
 
 export const generateAIImage = async (prompt: string, modelName: string = 'gemini-2.5-flash-image') => {
-  const imageAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) throw new Error("API Key is missing");
+  const imageAi = new GoogleGenAI({ apiKey });
+  
   const isPro = modelName.includes('pro');
   
-  // 核心修復：極速模型 (gemini-2.5-flash-image) 嚴禁設定 imageSize
+  // imageSize is only for gemini-3-pro-image-preview
   const imageConfig: any = {
     aspectRatio: "16:9"
   };
@@ -61,26 +70,34 @@ export const generateAIImage = async (prompt: string, modelName: string = 'gemin
     imageConfig.imageSize = "4K";
   }
 
-  const response = await imageAi.models.generateContent({
-    model: modelName,
-    contents: { parts: [{ text: prompt }] },
-    config: {
-      imageConfig: imageConfig
-    }
-  });
+  try {
+    const response = await imageAi.models.generateContent({
+      model: modelName,
+      contents: { parts: [{ text: prompt }] },
+      config: {
+        imageConfig: imageConfig
+      }
+    });
 
-  if (!response.candidates?.[0]?.content?.parts) return null;
+    if (!response.candidates?.[0]?.content?.parts) return null;
 
-  for (const part of response.candidates[0].content.parts) {
-    if (part.inlineData) {
-      return `data:image/png;base64,${part.inlineData.data}`;
+    for (const part of response.candidates[0].content.parts) {
+      if (part.inlineData) {
+        return `data:image/png;base64,${part.inlineData.data}`;
+      }
     }
+    return null;
+  } catch (error) {
+    console.error("Image generation failed", error);
+    throw error;
   }
-  return null;
 };
 
 export const analyzeImage = async (base64Image: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) throw new Error("API Key is missing");
+  const ai = new GoogleGenAI({ apiKey });
+  
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: {
@@ -90,14 +107,17 @@ export const analyzeImage = async (base64Image: string) => {
       ]
     }
   });
-  return JSON.parse(response.text || '{}');
+  return response.text;
 };
 
 export const generateImagePrompt = async (text: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) throw new Error("API Key is missing");
+  const ai = new GoogleGenAI({ apiKey });
+  
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `根據這段文案撰寫一段適合 AI 繪圖的英文 Prompt： "${text}"。只回傳 Prompt。`
+    contents: `根據這段文案撰寫一段適合 AI 繪圖的英文 Prompt： "${text}"。只回傳 Prompt 內容。`
   });
   return response.text;
 };
