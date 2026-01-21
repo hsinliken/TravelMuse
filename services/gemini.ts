@@ -1,11 +1,10 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const generateTravelPlan = async (destination: string, tone: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const response = await ai.models.generateContent({
-    model: 'gemini-3-pro-preview',
+    model: 'gemini-3-flash-preview',
     contents: `請為「${destination}」創作深度行銷文案。品牌風格要求：${tone}。必須使用繁體中文。總共 4 個區塊。`,
     config: {
       responseMimeType: "application/json",

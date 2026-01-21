@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { TravelTemplate, Project, ToneType, Paragraph } from '../types';
 import { generateTravelPlan } from '../services/gemini';
-import { Sparkles, MapPin, Palette, Loader2, ArrowRight, X, Edit3 } from 'lucide-react';
+import { Sparkles, MapPin, Palette, Loader2, ArrowRight, X, Edit3, Key } from 'lucide-react';
 
 interface ProjectWizardProps {
   templates: TravelTemplate[];
@@ -17,15 +16,22 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [customToneInput, setCustomToneInput] = useState('');
   const [isCustomStyle, setIsCustomStyle] = useState(false);
+  const [keyError, setKeyError] = useState(false);
 
   const handleStart = async () => {
+    // Check if an API key is available or needs selection
+    if (window.aistudio && !(await window.aistudio.hasSelectedApiKey()) && !process.env.API_KEY) {
+      await window.aistudio.openSelectKey();
+      // Proceed assuming key was selected as per instructions
+    }
+
     setLoading(true);
+    setKeyError(false);
     try {
       const template = templates.find(t => t.id === selectedTemplateId);
       const tone = isCustomStyle ? customToneInput : (template ? template.name : '標準商務行銷');
       const data = await generateTravelPlan(destination, tone);
       
-      // 確保 sections 存在且格式正確
       const sections = data.sections || [];
       
       const paragraphs: Paragraph[] = sections.map((s: any, index: number) => ({
@@ -48,9 +54,16 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
       };
       
       onComplete(newProject);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Project Generation Error:", error);
-      alert("生成文案時發生錯誤，這可能是由於網路不穩定。請再試一次。");
+      if (error?.message?.includes("API Key must be set") || error?.message?.includes("Requested entity was not found")) {
+        setKeyError(true);
+        if (window.aistudio) {
+          await window.aistudio.openSelectKey();
+        }
+      } else {
+        alert("生成文案時發生錯誤，這可能是由於網路不穩定。請再試一次。");
+      }
     } finally {
       setLoading(false);
     }
@@ -153,13 +166,20 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
                 </p>
               </div>
 
+              {keyError && (
+                <div className="bg-amber-50 p-4 rounded-2xl flex items-center gap-3 text-amber-700 text-xs text-left max-w-md mx-auto border border-amber-100">
+                  <Key size={16} className="shrink-0" />
+                  <p>檢測到 API Key 設定問題。請點擊按鈕選擇有效的 API Key（建議選擇已啟用的付費專案）以繼續。</p>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3">
                 <button 
                   disabled={loading}
                   onClick={handleStart}
                   className="bg-stone-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-stone-800 transition-all shadow-lg"
                 >
-                  {loading ? '正在分析內容構想...' : '確認並開始生成'} 
+                  {loading ? '正在分析內容構想...' : keyError ? '重新選擇金鑰並重試' : '確認並開始生成'} 
                 </button>
                 <button 
                   disabled={loading}
