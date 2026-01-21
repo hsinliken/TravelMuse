@@ -1,7 +1,7 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const generateTravelPlan = async (destination: string, tone: string) => {
-  // Use the required initialization syntax
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const response = await ai.models.generateContent({
@@ -60,7 +60,6 @@ export const generateAIImage = async (prompt: string, modelName: string = 'gemin
     aspectRatio: "16:9"
   };
 
-  // imageSize is only for gemini-3-pro-image-preview
   if (isPro) {
     imageConfig.imageSize = "4K";
   }
