@@ -1,9 +1,8 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const generateTravelPlan = async (destination: string, tone: string) => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key is missing");
-  const ai = new GoogleGenAI({ apiKey });
+  // Use the required initialization syntax
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
@@ -43,9 +42,7 @@ export const generateTravelPlan = async (destination: string, tone: string) => {
 };
 
 export const refineParagraph = async (currentContent: string, focus: string, tone: string) => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key is missing");
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
@@ -55,17 +52,15 @@ export const refineParagraph = async (currentContent: string, focus: string, ton
 };
 
 export const generateAIImage = async (prompt: string, modelName: string = 'gemini-2.5-flash-image') => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key is missing");
-  const imageAi = new GoogleGenAI({ apiKey });
+  const imageAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const isPro = modelName.includes('pro');
   
-  // imageSize is only for gemini-3-pro-image-preview
   const imageConfig: any = {
     aspectRatio: "16:9"
   };
 
+  // imageSize is only for gemini-3-pro-image-preview
   if (isPro) {
     imageConfig.imageSize = "4K";
   }
@@ -94,16 +89,14 @@ export const generateAIImage = async (prompt: string, modelName: string = 'gemin
 };
 
 export const analyzeImage = async (base64Image: string) => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key is missing");
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: {
       parts: [
         { inlineData: { data: base64Image.split(',')[1], mimeType: 'image/jpeg' } },
-        { text: "分析此圖片。" }
+        { text: "分析此圖片視覺特徵。" }
       ]
     }
   });
@@ -111,13 +104,11 @@ export const analyzeImage = async (base64Image: string) => {
 };
 
 export const generateImagePrompt = async (text: string) => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) throw new Error("API Key is missing");
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `根據這段文案撰寫一段適合 AI 繪圖的英文 Prompt： "${text}"。只回傳 Prompt 內容。`
+    contents: `根據這段文案撰寫一段適合 AI 繪圖的英文 Prompt： "${text}"。只回傳 Prompt 內容文字。`
   });
   return response.text;
 };
