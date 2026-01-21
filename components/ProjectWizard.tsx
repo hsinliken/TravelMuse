@@ -19,23 +19,25 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
   const [keyError, setKeyError] = useState(false);
 
   const handleStart = async () => {
-    // 關鍵修正：在呼叫任何 API 之前，先檢查金鑰
-    // 如果 process.env.API_KEY 不存在，且在 AISTUDIO 環境中，主動要求選擇金鑰
-    if (window.aistudio && !process.env.API_KEY) {
-      const hasKey = await window.aistudio.hasSelectedApiKey();
-      if (!hasKey) {
-        await window.aistudio.openSelectKey();
-        // 根據指導原則，開啟視窗後假設成功並繼續
-      }
-    }
-
-    setLoading(true);
+    // 強制重設錯誤狀態
     setKeyError(false);
+    setLoading(true);
+
     try {
+      // 1. 如果是在 AI Studio 環境且當前金鑰疑似無效，主動觸發選取器
+      if (window.aistudio) {
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        // 如果沒有 key 或處於 error 狀態重試，則彈出視窗
+        if (!hasKey || !process.env.API_KEY) {
+          await window.aistudio.openSelectKey();
+          // 根據規則：觸發後直接繼續，不等待
+        }
+      }
+
       const template = templates.find(t => t.id === selectedTemplateId);
       const tone = isCustomStyle ? customToneInput : (template ? template.name : '標準商務行銷');
       
-      // 呼叫 API
+      // 2. 呼叫 API (此處會拋出 "API Key must be set" 若 key 仍為空)
       const data = await generateTravelPlan(destination, tone);
       
       const sections = data.sections || [];
@@ -61,14 +63,20 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
       onComplete(newProject);
     } catch (error: any) {
       console.error("Project Generation Error:", error);
-      // 如果報錯包含 API Key 相關訊息，引導使用者重新選擇
-      if (error?.message?.includes("API Key must be set") || error?.message?.includes("Requested entity was not found")) {
+      
+      // 3. 攔截 API Key 錯誤並更新 UI
+      if (
+        error?.message?.includes("API Key must be set") || 
+        error?.message?.includes("Requested entity was not found") ||
+        error?.message?.includes("API_KEY")
+      ) {
         setKeyError(true);
+        // 如果報錯了，再次嘗試開啟選取器引導使用者
         if (window.aistudio) {
           await window.aistudio.openSelectKey();
         }
       } else {
-        alert("生成文案時發生錯誤，這可能是由於網路不穩定。請再試一次。");
+        alert("生成文案時發生錯誤，請確認網路連線或金鑰權限後再試。");
       }
     } finally {
       setLoading(false);
@@ -173,9 +181,9 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
               </div>
 
               {keyError && (
-                <div className="bg-amber-50 p-4 rounded-2xl flex items-center gap-3 text-amber-700 text-xs text-left max-w-md mx-auto border border-amber-100">
+                <div className="bg-amber-50 p-4 rounded-2xl flex items-center gap-3 text-amber-700 text-xs text-left max-w-md mx-auto border border-amber-100 animate-in fade-in slide-in-from-top-2">
                   <Key size={16} className="shrink-0" />
-                  <p>檢測到 API Key 設定問題。請點擊下方的「重新授權金鑰」以繼續，建議選擇已啟用的付費專案。</p>
+                  <p>偵測到 API Key 讀取失敗。若您在 AI Studio 預覽，請點擊下方按鈕手動授權金鑰以繼續。</p>
                 </div>
               )}
 
@@ -183,14 +191,14 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
                 <button 
                   disabled={loading}
                   onClick={handleStart}
-                  className="bg-stone-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-stone-800 transition-all shadow-lg"
+                  className="bg-stone-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-stone-800 transition-all shadow-lg disabled:opacity-70"
                 >
-                  {loading ? '正在分析內容構想...' : keyError ? '重新授權金鑰並重試' : '確認並開始生成'} 
+                  {loading ? '正在分析內容構想...' : keyError ? '點此重新授權金鑰並重試' : '確認並開始生成'} 
                 </button>
                 <button 
                   disabled={loading}
                   onClick={() => setStep(1)}
-                  className="text-stone-400 font-medium hover:text-stone-900"
+                  className="text-stone-400 font-medium hover:text-stone-900 transition-colors"
                 >
                   返回上一步
                 </button>
