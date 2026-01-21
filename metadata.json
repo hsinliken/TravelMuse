@@ -1,0 +1,7 @@
+{
+  "name": "TravelMuse AI v4.0",
+  "description": "A brand-memory powered AI platform for travel marketing. Create high-quality content with interactive style engines, multimodal integration, and multi-format exports.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
