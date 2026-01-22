@@ -19,13 +19,24 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
   const [keyError, setKeyError] = useState(false);
 
   const handleStart = async () => {
-    // 安全地檢查 API Key，避免因為 process.env 未定義或 API_KEY 為空而崩潰
-    const apiKey = typeof process !== 'undefined' ? process.env?.API_KEY : undefined;
+    // 如果已經顯示錯誤，點擊時直接觸發金鑰選擇
+    if (keyError && window.aistudio) {
+      try {
+        await window.aistudio.openSelectKey();
+        setKeyError(false);
+        // 開啟視窗後不自動執行，讓使用者選完後再點一次確認，避免 API 再次因為 key 未同步而失敗
+        return;
+      } catch (e) {
+        console.error("Failed to open select key dialog", e);
+      }
+    }
 
-    if (window.aistudio && !apiKey) {
-      console.log("Missing API Key, prompting user...");
+    const apiKey = process.env.API_KEY;
+
+    // 檢查環境中是否完全沒有 Key 且支援 AI Studio 工具
+    if (!apiKey && window.aistudio) {
       await window.aistudio.openSelectKey();
-      // 根據規範，呼叫後直接嘗試繼續，系統會自動處理 key 的注入
+      // 根據規範，呼叫後假設成功並繼續，但如果接下來還是失敗會進入 catch 設為 keyError
     }
 
     setKeyError(false);
@@ -35,7 +46,6 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
       const template = templates.find(t => t.id === selectedTemplateId);
       const tone = isCustomStyle ? customToneInput : (template ? template.name : '標準商務行銷');
       
-      // 執行 API
       const data = await generateTravelPlan(destination, tone);
       
       const sections = data.sections || [];
@@ -60,17 +70,20 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
       
       onComplete(newProject);
     } catch (error: any) {
-      console.error("Project Generation Detailed Error:", error);
+      console.error("Project Generation Error:", error);
       
       const errorMsg = error?.message || "";
-      // 捕捉金鑰相關錯誤
-      if (errorMsg.includes("API Key") || errorMsg.includes("403") || errorMsg.includes("401") || errorMsg.includes("process is not defined")) {
+      // 捕捉金鑰相關錯誤（包括 SDK 丟出的 An API Key must be set）
+      if (
+        errorMsg.includes("API Key") || 
+        errorMsg.includes("403") || 
+        errorMsg.includes("401") || 
+        errorMsg.includes("not defined") ||
+        errorMsg.includes("API_KEY")
+      ) {
         setKeyError(true);
-        if (window.aistudio) {
-          await window.aistudio.openSelectKey();
-        }
       } else {
-        alert("生成文案時發生錯誤。請確認您的 API Key 已啟用付費專案且網路連線正常。");
+        alert("生成文案時發生錯誤。請檢查網路連線或稍後再試。");
       }
     } finally {
       setLoading(false);
@@ -175,8 +188,8 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
               </div>
 
               {keyError && (
-                <div className="bg-amber-50 p-4 rounded-2xl flex items-center gap-3 text-amber-700 text-xs text-left max-w-md mx-auto border border-amber-100 animate-in slide-in-from-top-2">
-                  <Key size={16} className="shrink-0" />
+                <div className="bg-amber-50 p-4 rounded-2xl flex items-center gap-3 text-amber-700 text-[11px] text-left max-w-md mx-auto border border-amber-100 animate-in slide-in-from-top-2">
+                  <Key size={16} className="shrink-0 text-amber-500" />
                   <p>偵測到 API Key 無法讀取或授權失效。請點擊下方按鈕選取一個<b>已啟用付費專案（Paid Project）</b>的金鑰以繼續使用。</p>
                 </div>
               )}
@@ -185,13 +198,13 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
                 <button 
                   disabled={loading}
                   onClick={handleStart}
-                  className="bg-stone-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-stone-800 transition-all shadow-lg disabled:opacity-70"
+                  className={`py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 disabled:opacity-70 ${keyError ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-stone-900 text-white hover:bg-stone-800'}`}
                 >
                   {loading ? '正在分析內容構想...' : keyError ? '點此開啟選取視窗並重試' : '確認並開始生成'} 
                 </button>
                 <button 
                   disabled={loading}
-                  onClick={() => setStep(1)}
+                  onClick={() => { setStep(1); setKeyError(false); }}
                   className="text-stone-400 font-medium hover:text-stone-900 transition-colors"
                 >
                   返回上一步
