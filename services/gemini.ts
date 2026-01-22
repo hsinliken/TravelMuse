@@ -77,13 +77,13 @@ export const refineParagraph = async (currentContent: string, focus: string, ton
 };
 
 export const generateAIImage = async (prompt: string, modelName: string = 'gemini-2.5-flash-image') => {
-  const imageAi = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const isPro = modelName.includes('pro');
   const imageConfig: any = { aspectRatio: "16:9" };
   if (isPro) imageConfig.imageSize = "4K";
 
   try {
-    const response = await imageAi.models.generateContent({
+    const response = await ai.models.generateContent({
       model: modelName,
       contents: { parts: [{ text: prompt }] },
       config: { imageConfig: imageConfig }

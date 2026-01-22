@@ -7,7 +7,7 @@ import {
   RefreshCw, Type as TypeIcon, Palette as PaletteIcon, X,
   CaseSensitive, Eye, Wand2, LogOut, ChevronUp, ChevronDown, 
   History, Zap, MousePointer2, Printer, Check, ChevronRightSquare,
-  Cpu, AlertCircle
+  Cpu, AlertCircle, Info
 } from 'lucide-react';
 
 declare global {
@@ -41,6 +41,7 @@ const Editor: React.FC<EditorProps> = ({ project, customFonts, onSave, onClose }
   const [isGeneratingPrompt, setIsGeneratingPrompt] = useState(false);
   const [imageProgress, setImageProgress] = useState<string>('');
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isPrintGuideOpen, setIsPrintGuideOpen] = useState(false);
   const [editedProject, setEditedProject] = useState<Project>(project);
   const [imgModel, setImgModel] = useState<'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview'>('gemini-2.5-flash-image');
   const [showHistory, setShowHistory] = useState(false);
@@ -49,11 +50,14 @@ const Editor: React.FC<EditorProps> = ({ project, customFonts, onSave, onClose }
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isPreviewOpen) setIsPreviewOpen(false);
+      if (e.key === 'Escape') {
+        if (isPreviewOpen) setIsPreviewOpen(false);
+        if (isPrintGuideOpen) setIsPrintGuideOpen(false);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPreviewOpen]);
+  }, [isPreviewOpen, isPrintGuideOpen]);
 
   const activePara = editedProject.paragraphs.find(p => p.id === activeParaId);
 
@@ -80,46 +84,17 @@ const Editor: React.FC<EditorProps> = ({ project, customFonts, onSave, onClose }
     setTimeout(() => setIsSaving(false), 800);
   };
 
-  // 解決沙盒列印問題的「安全模式」
   const handlePrint = () => {
-    try {
-      // 先嘗試直接列印
-      window.print();
-    } catch (e) {
-      console.warn("Direct printing blocked by sandbox, attempting fallback...");
-      // 備案：開啟新分頁渲染列印內容
-      const printContent = document.getElementById('print-section')?.innerHTML;
-      if (!printContent) return;
-
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>${editedProject.title}</title>
-              <style>
-                body { font-family: 'Inter', 'Noto Serif TC', serif; padding: 40px; color: #1c1917; line-height: 1.6; }
-                h1 { font-size: 32pt; margin-bottom: 10px; }
-                h2 { font-size: 24pt; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-top: 40px; }
-                p { font-size: 12pt; white-space: pre-wrap; }
-                img { max-width: 100%; height: auto; border-radius: 12px; margin-top: 20px; }
-                footer { margin-top: 60px; font-size: 9pt; color: #a8a29e; text-align: center; }
-                @media print { .no-print { display: none; } }
-              </style>
-            </head>
-            <body>
-              ${printContent}
-              <script>
-                setTimeout(() => { window.print(); window.close(); }, 500);
-              </script>
-            </body>
-          </html>
-        `);
-        printWindow.document.close();
-      } else {
-        alert("列印視窗被瀏覽器攔截。請點擊預覽模式，並使用右鍵選擇「列印」或手動儲存為 PDF。");
+    // 開啟專屬列印導引視窗
+    setIsPrintGuideOpen(true);
+    // 嘗試呼叫列印，如果被封鎖，使用者仍能看到導引介面手動列印
+    setTimeout(() => {
+      try {
+        window.print();
+      } catch (e) {
+        console.warn("Print triggered but might be blocked by sandbox.");
       }
-    }
+    }, 500);
   };
 
   const handleRefine = async (focus: string) => {
@@ -132,7 +107,7 @@ const Editor: React.FC<EditorProps> = ({ project, customFonts, onSave, onClose }
       setRefineSuggestions(suggestions);
     } catch (e) {
       console.error(e);
-      alert("文案優化失敗，請檢查網路連線。");
+      alert("文案優化失敗，請檢查網路連線或 API Key。");
     } finally {
       setIsRefining(false);
     }
@@ -193,7 +168,7 @@ const Editor: React.FC<EditorProps> = ({ project, customFonts, onSave, onClose }
         if (window.aistudio) await window.aistudio.openSelectKey();
       } else {
         console.error(e);
-        alert("影像生成失敗，請更換模型或稍後再試。"); 
+        alert("影像生成失敗，請確認 API Key 權限或稍後再試。"); 
       }
     } 
     finally { 
@@ -229,21 +204,21 @@ const Editor: React.FC<EditorProps> = ({ project, customFonts, onSave, onClose }
 
   return (
     <div className="flex flex-col h-[calc(100vh-140px)] animate-in fade-in duration-500">
+      {/* 列印專用 CSS */}
       <style dangerouslySetInnerHTML={{ __html: `
         @media print {
-          body * { visibility: hidden; }
-          #print-section, #print-section * { visibility: visible; }
+          body * { visibility: hidden !important; }
+          #print-section, #print-section * { visibility: visible !important; }
           #print-section {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            padding: 2cm;
-            background: white;
-            z-index: 9999;
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            padding: 2cm !important;
+            background: white !important;
+            display: block !important;
           }
           .no-print { display: none !important; }
-          section { page-break-inside: avoid; margin-bottom: 2cm; }
         }
       `}} />
 
@@ -492,13 +467,14 @@ const Editor: React.FC<EditorProps> = ({ project, customFonts, onSave, onClose }
         </div>
       </div>
 
+      {/* 列印專用的視圖區塊 */}
       <div id="print-section" className="hidden print:block bg-white text-stone-900">
         <header className="mb-20 text-center">
           <h1 className="text-5xl font-bold serif mb-4">{editedProject.title}</h1>
           <p className="text-stone-400 uppercase tracking-widest text-sm">{editedProject.destination}</p>
         </header>
         {editedProject.paragraphs.map((p, idx) => (
-          <section key={p.id} className="mb-24 space-y-8">
+          <section key={p.id} className="mb-24 space-y-8 page-break-inside-avoid">
             <div className="space-y-4">
               <h2 className="text-3xl font-bold serif" style={{color: p.color, fontFamily: p.fontFamily}}>
                 <span className="text-stone-200 mr-4 font-light italic">0{idx + 1}</span> {p.title}
@@ -518,6 +494,45 @@ const Editor: React.FC<EditorProps> = ({ project, customFonts, onSave, onClose }
           TravelMuse AI Marketing Asset • Generated for {editedProject.destination}
         </footer>
       </div>
+
+      {/* 列印導引視窗 - 解決沙盒 Modal 封鎖問題 */}
+      {isPrintGuideOpen && (
+        <div className="fixed inset-0 z-[300] bg-white flex flex-col animate-in fade-in duration-300">
+          <div className="bg-stone-900 text-white p-6 flex justify-between items-center shadow-xl no-print">
+             <div className="flex items-center gap-3">
+               <div className="bg-amber-400 p-2 rounded-lg text-stone-900"><Info size={20}/></div>
+               <div>
+                 <h3 className="font-bold text-sm">列印導引模式</h3>
+                 <p className="text-[10px] text-stone-400">若列印視窗未自動開啟，請按 <span className="bg-white/20 px-1 rounded text-white font-mono">Ctrl+P</span> (或 <span className="bg-white/20 px-1 rounded text-white font-mono">Cmd+P</span>)</p>
+               </div>
+             </div>
+             <button 
+              onClick={() => setIsPrintGuideOpen(false)} 
+              className="px-6 py-2 bg-white text-stone-900 rounded-full font-bold text-xs hover:bg-stone-100 transition-all shadow-md active:scale-95"
+             >
+               關閉導引並返回
+             </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-12 bg-stone-50">
+             <div className="bg-white max-w-4xl mx-auto p-16 shadow-2xl rounded-sm border border-stone-200">
+                {/* 複製一份列印內容用於引導畫面顯示 */}
+                <header className="mb-16 text-center">
+                  <h1 className="text-4xl font-bold serif mb-2">{editedProject.title}</h1>
+                  <p className="text-stone-400 uppercase tracking-widest text-xs">{editedProject.destination}</p>
+                </header>
+                {editedProject.paragraphs.map((p, idx) => (
+                  <div key={p.id} className="mb-16">
+                    <h2 className="text-xl font-bold mb-4 serif flex items-center gap-2">
+                      <span className="text-stone-200 italic font-light">0{idx+1}</span> {p.title}
+                    </h2>
+                    <p className="text-stone-700 text-sm leading-relaxed whitespace-pre-wrap mb-6">{p.content}</p>
+                    {p.uploadedImage && <img src={p.uploadedImage} className="w-full h-auto rounded-lg" />}
+                  </div>
+                ))}
+             </div>
+          </div>
+        </div>
+      )}
 
       {isPreviewOpen && (
         <div className="fixed inset-0 z-[200] bg-stone-950/90 backdrop-blur-md flex items-center justify-center p-4 md:p-12 overflow-y-auto" onClick={() => setIsPreviewOpen(false)}>
