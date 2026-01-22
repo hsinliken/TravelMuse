@@ -1,7 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
+const getAIClient = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey || apiKey.trim() === "") {
+    // 拋出明確的診斷訊息，由 UI 捕捉顯示
+    throw new Error("DIAGNOSTIC_ERROR: API_KEY_MISSING_OR_EMPTY (環境變數 API_KEY 未設定或為空值)");
+  }
+  return new GoogleGenAI({ apiKey });
+};
+
 export const generateTravelPlan = async (destination: string, tone: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
@@ -41,7 +50,7 @@ export const generateTravelPlan = async (destination: string, tone: string) => {
 };
 
 export const refineParagraph = async (currentContent: string, focus: string, tone: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `優化旅遊文案。重點：${focus}。品牌風格：${tone}。原文： "${currentContent}"。請使用繁體中文。請提供三種不同切入點的優化版本。每個版本必須包含「規劃說明（短）」與「文案內容（完整）」。`,
@@ -77,7 +86,7 @@ export const refineParagraph = async (currentContent: string, focus: string, ton
 };
 
 export const generateAIImage = async (prompt: string, modelName: string = 'gemini-2.5-flash-image') => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   const isPro = modelName.includes('pro');
   const imageConfig: any = { aspectRatio: "16:9" };
   if (isPro) imageConfig.imageSize = "4K";
@@ -99,7 +108,7 @@ export const generateAIImage = async (prompt: string, modelName: string = 'gemin
 };
 
 export const analyzeImage = async (base64Image: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: {
@@ -113,7 +122,7 @@ export const analyzeImage = async (base64Image: string) => {
 };
 
 export const generateImagePrompt = async (text: string) => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = getAIClient();
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `根據這段文案撰寫一段適合 AI 繪圖的英文 Prompt： "${text}"。只需要回傳 Prompt 內容文字。`

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TravelTemplate, Project, ToneType, Paragraph } from '../types';
 import { generateTravelPlan } from '../services/gemini';
-import { Sparkles, MapPin, Palette, Loader2, ArrowRight, X, Edit3, Key } from 'lucide-react';
+import { Sparkles, MapPin, Palette, Loader2, ArrowRight, X, Edit3, Key, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 interface ProjectWizardProps {
   templates: TravelTemplate[];
@@ -16,30 +16,35 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [customToneInput, setCustomToneInput] = useState('');
   const [isCustomStyle, setIsCustomStyle] = useState(false);
-  const [keyError, setKeyError] = useState(false);
+  const [keyError, setKeyError] = useState<string | null>(null);
+  const [hasAiStudio, setHasAiStudio] = useState(false);
 
-  const handleStart = async () => {
-    // 如果已經顯示錯誤，點擊時直接觸發金鑰選擇
-    if (keyError && window.aistudio) {
+  useEffect(() => {
+    // 檢查環境是否支援 AI Studio 金鑰選取
+    setHasAiStudio(!!window.aistudio);
+  }, []);
+
+  const openKeyDialog = async () => {
+    if (window.aistudio) {
       try {
         await window.aistudio.openSelectKey();
-        setKeyError(false);
-        // 開啟視窗後不自動執行，讓使用者選完後再點一次確認，避免 API 再次因為 key 未同步而失敗
-        return;
+        setKeyError(null); // 嘗試開啟後清除錯誤狀態
       } catch (e) {
-        console.error("Failed to open select key dialog", e);
+        console.error("Failed to open key dialog", e);
       }
+    } else {
+      alert("目前的環境不支援 AI Studio 金鑰選取工具，請確認是否在正確的預覽視窗中開啟。");
+    }
+  };
+
+  const handleStart = async () => {
+    // 如果已有錯誤，點擊主按鈕直接開啟對話框
+    if (keyError) {
+      await openKeyDialog();
+      return;
     }
 
-    const apiKey = process.env.API_KEY;
-
-    // 檢查環境中是否完全沒有 Key 且支援 AI Studio 工具
-    if (!apiKey && window.aistudio) {
-      await window.aistudio.openSelectKey();
-      // 根據規範，呼叫後假設成功並繼續，但如果接下來還是失敗會進入 catch 設為 keyError
-    }
-
-    setKeyError(false);
+    setKeyError(null);
     setLoading(true);
 
     try {
@@ -70,20 +75,19 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
       
       onComplete(newProject);
     } catch (error: any) {
-      console.error("Project Generation Error:", error);
+      console.error("Project Generation Detailed Error:", error);
       
       const errorMsg = error?.message || "";
-      // 捕捉金鑰相關錯誤（包括 SDK 丟出的 An API Key must be set）
+      // 捕捉金鑰相關錯誤
       if (
         errorMsg.includes("API Key") || 
+        errorMsg.includes("DIAGNOSTIC_ERROR") ||
         errorMsg.includes("403") || 
-        errorMsg.includes("401") || 
-        errorMsg.includes("not defined") ||
-        errorMsg.includes("API_KEY")
+        errorMsg.includes("401")
       ) {
-        setKeyError(true);
+        setKeyError(errorMsg);
       } else {
-        alert("生成文案時發生錯誤。請檢查網路連線或稍後再試。");
+        alert(`生成失敗: ${errorMsg}`);
       }
     } finally {
       setLoading(false);
@@ -96,7 +100,14 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
     <div className="fixed inset-0 z-[60] bg-stone-900/40 backdrop-blur-xl flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
         <div className="px-8 py-6 border-b border-stone-100 flex items-center justify-between bg-stone-50/50">
-          <h2 className="text-xl font-bold serif text-stone-800">建立新文案</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-xl font-bold serif text-stone-800">建立新文案</h2>
+            {hasAiStudio && (
+              <span className="bg-emerald-50 text-emerald-600 text-[9px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                <ShieldCheck size={10} /> AI Studio 已連線
+              </span>
+            )}
+          </div>
           <button onClick={onCancel} className="text-stone-400 hover:text-stone-900 transition-colors">
             <X size={20} />
           </button>
@@ -188,9 +199,17 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
               </div>
 
               {keyError && (
-                <div className="bg-amber-50 p-4 rounded-2xl flex items-center gap-3 text-amber-700 text-[11px] text-left max-w-md mx-auto border border-amber-100 animate-in slide-in-from-top-2">
-                  <Key size={16} className="shrink-0 text-amber-500" />
-                  <p>偵測到 API Key 無法讀取或授權失效。請點擊下方按鈕選取一個<b>已啟用付費專案（Paid Project）</b>的金鑰以繼續使用。</p>
+                <div className="bg-amber-50 p-6 rounded-2xl space-y-3 text-left max-w-md mx-auto border border-amber-200 animate-in slide-in-from-top-2">
+                  <div className="flex items-center gap-3 text-amber-700 font-bold text-sm">
+                    <AlertTriangle size={18} className="text-amber-500" />
+                    金鑰設定診斷
+                  </div>
+                  <div className="text-[10px] text-amber-800 bg-white/50 p-3 rounded-lg font-mono break-all leading-relaxed">
+                    <span className="text-amber-400 font-bold">ERROR:</span> {keyError}
+                  </div>
+                  <p className="text-[11px] text-amber-600 leading-relaxed">
+                    請點擊下方按鈕選取金鑰。如果是 Vercel 環境，請確保已在專案 Settings -> Environment Variables 中加入 <code className="bg-amber-100 px-1 rounded">API_KEY</code> 並重新部署。
+                  </p>
                 </div>
               )}
 
@@ -198,13 +217,13 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
                 <button 
                   disabled={loading}
                   onClick={handleStart}
-                  className={`py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 disabled:opacity-70 ${keyError ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-stone-900 text-white hover:bg-stone-800'}`}
+                  className={`py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl active:scale-95 disabled:opacity-70 ${keyError ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-stone-900 text-white hover:bg-stone-800'}`}
                 >
-                  {loading ? '正在分析內容構想...' : keyError ? '點此開啟選取視窗並重試' : '確認並開始生成'} 
+                  {loading ? '正在分析內容構想...' : keyError ? '開啟金鑰選取視窗' : '確認並開始生成'} 
                 </button>
                 <button 
                   disabled={loading}
-                  onClick={() => { setStep(1); setKeyError(false); }}
+                  onClick={() => { setStep(1); setKeyError(null); }}
                   className="text-stone-400 font-medium hover:text-stone-900 transition-colors"
                 >
                   返回上一步
