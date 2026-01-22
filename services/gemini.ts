@@ -1,7 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 export const generateTravelPlan = async (destination: string, tone: string) => {
-  // 必須在函式內部實例化
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const response = await ai.models.generateContent({
@@ -45,9 +44,36 @@ export const refineParagraph = async (currentContent: string, focus: string, ton
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `優化旅遊文案。重點：${focus}。品牌風格：${tone}。原文： "${currentContent}"。請使用繁體中文。`,
+    contents: `優化旅遊文案。重點：${focus}。品牌風格：${tone}。原文： "${currentContent}"。請使用繁體中文。請提供三種不同切入點的優化版本。每個版本必須包含「規劃說明（短）」與「文案內容（完整）」。`,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          suggestions: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                plan: { type: Type.STRING, description: "此版本的創作規劃與策略說明" },
+                content: { type: Type.STRING, description: "優化後的完整文案內容" }
+              },
+              required: ["plan", "content"]
+            },
+            description: "三個不同版本的優化建議"
+          }
+        },
+        required: ["suggestions"]
+      }
+    }
   });
-  return response.text;
+  try {
+    const data = JSON.parse(response.text || '{"suggestions":[]}');
+    return data.suggestions;
+  } catch (e) {
+    console.error("Parse suggestions error", e);
+    return []; 
+  }
 };
 
 export const generateAIImage = async (prompt: string, modelName: string = 'gemini-2.5-flash-image') => {
@@ -90,7 +116,7 @@ export const generateImagePrompt = async (text: string) => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `根據這段文案撰寫一段適合 AI 繪圖的英文 Prompt： "${text}"。只回傳 Prompt 內容文字。`
+    contents: `根據這段文案撰寫一段適合 AI 繪圖的英文 Prompt： "${text}"。只需要回傳 Prompt 內容文字。`
   });
   return response.text;
 };
