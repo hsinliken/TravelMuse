@@ -2,10 +2,16 @@ import { GoogleGenAI, Type } from "@google/genai";
 
 const getAIClient = () => {
   const apiKey = process.env.API_KEY;
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'unknown';
+  
   if (!apiKey || apiKey.trim() === "") {
-    // 拋出明確的診斷訊息，由 UI 捕捉顯示
-    throw new Error("DIAGNOSTIC_ERROR: API_KEY_MISSING_OR_EMPTY (環境變數 API_KEY 未設定或為空值)");
+    throw new Error(`API_KEY_ERROR: 環境變數 API_KEY 遺失或為空字串。目前執行環境：${hostname}。請確認 Vercel Dashboard 或 .env 設定。`);
   }
+  
+  if (apiKey === "undefined" || apiKey === "null") {
+    throw new Error(`API_KEY_ERROR: 偵測到無效的金鑰字串 "${apiKey}"。這通常是 Vercel 設定錯誤所致。`);
+  }
+
   return new GoogleGenAI({ apiKey });
 };
 
