@@ -20,22 +20,20 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
   const [hasAiStudio, setHasAiStudio] = useState(false);
 
   useEffect(() => {
-    // 檢查環境是否支援 AI Studio 金鑰選取
     setHasAiStudio(!!window.aistudio);
   }, []);
 
   const openKeyDialog = async () => {
     if (window.aistudio) {
       try {
-        console.log("Attempting to open AI Studio Key Dialog...");
         await window.aistudio.openSelectKey();
         setKeyError(null);
       } catch (e) {
         console.error("Failed to open key dialog", e);
-        alert("無法開啟金鑰選取視窗，請確認瀏覽器是否封鎖了彈窗。");
+        alert("無法開啟金鑰選取視窗，請檢查彈窗攔截設定。");
       }
     } else {
-      alert("目前的環境不支援 AI Studio 金鑰選取工具。請檢查 Vercel 環境變數 API_KEY。");
+      alert("環境不支援金鑰選取工具，請確認是否已在專案設定中加入 API_KEY。");
     }
   };
 
@@ -79,7 +77,6 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
       console.error("Project Generation Detailed Error:", error);
       const errorMsg = error?.message || "未知錯誤";
       
-      // 捕捉金鑰相關錯誤
       if (
         errorMsg.includes("API Key") || 
         errorMsg.includes("API_KEY") ||
@@ -96,18 +93,15 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
     }
   };
 
-  // 預先計算以避免 JSX 編譯錯誤
   const currentTemplate = templates.find(t => t.id === selectedTemplateId);
   const displayToneName = isCustomStyle ? customToneInput : (currentTemplate?.name || '系統預設');
   const canProceed = destination && (selectedTemplateId || isCustomStyle ? (isCustomStyle ? customToneInput.length > 0 : true) : true);
 
-  // 診斷資訊
-  const diagnosticInfo = {
-    apiKeySet: !!process.env.API_KEY,
-    apiKeyLength: process.env.API_KEY?.length || 0,
-    hostname: typeof window !== 'undefined' ? window.location.hostname : 'N/A',
-    aiStudioAvailable: !!window.aistudio
-  };
+  // 診斷資訊數據準備
+  const envKey = process.env.API_KEY || '';
+  const isKeySet = envKey.length > 0;
+  const keyStatusText = isKeySet ? `已設定 (長度:${envKey.length})` : "未偵測到 API_KEY";
+  const hostname = typeof window !== 'undefined' ? window.location.hostname : 'N/A';
 
   return (
     <div className="fixed inset-0 z-[60] bg-stone-900/40 backdrop-blur-xl flex items-center justify-center p-4">
@@ -215,33 +209,33 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
                 <div className="bg-amber-50 p-6 rounded-2xl space-y-4 text-left max-w-md mx-auto border border-amber-200 animate-in slide-in-from-top-2">
                   <div className="flex items-center gap-3 text-amber-700 font-bold text-sm">
                     <AlertTriangle size={18} className="text-amber-500" />
-                    金鑰診斷與追蹤
+                    金鑰診斷面板
                   </div>
                   
                   <div className="text-[10px] text-amber-900 bg-white/50 p-4 rounded-xl border border-amber-100 font-mono space-y-2">
                      <div className="flex justify-between items-center border-b border-amber-100 pb-1">
-                       <span className="text-amber-400 font-bold uppercase">Env API_KEY:</span>
-                       <span className={diagnosticInfo.apiKeySet ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}>
-                         {diagnosticInfo.apiKeySet ? `已設定 (長度:${diagnosticInfo.apiKeyLength})` : "未設定"}
+                       <span className="text-amber-400 font-bold uppercase">ENV API_KEY:</span>
+                       <span className={isKeySet ? "text-emerald-600 font-bold" : "text-red-500 font-bold"}>
+                         {keyStatusText}
                        </span>
                      </div>
                      <div className="flex justify-between items-center border-b border-amber-100 pb-1">
-                       <span className="text-amber-400 font-bold uppercase">Host:</span>
-                       <span className="text-stone-600">{diagnosticInfo.hostname}</span>
+                       <span className="text-amber-400 font-bold uppercase">HOSTNAME:</span>
+                       <span className="text-stone-600">{hostname}</span>
                      </div>
                      <div className="flex justify-between items-center">
-                       <span className="text-amber-400 font-bold uppercase">AI Studio Context:</span>
-                       <span className={diagnosticInfo.aiStudioAvailable ? "text-emerald-600 font-bold" : "text-stone-400"}>
-                         {diagnosticInfo.aiStudioAvailable ? "支援選取" : "不支援"}
+                       <span className="text-amber-400 font-bold uppercase">AI STUDIO TOOL:</span>
+                       <span className={hasAiStudio ? "text-emerald-600 font-bold" : "text-stone-400"}>
+                         {hasAiStudio ? "可用 (可選取金鑰)" : "不可用"}
                        </span>
                      </div>
                      <div className="mt-3 text-red-700 italic border-l-2 border-red-300 pl-2 leading-relaxed">
-                        {keyError}
+                        錯誤詳情: {keyError}
                      </div>
                   </div>
                   
                   <p className="text-[11px] text-amber-600 leading-relaxed italic">
-                    提示：如果是 Vercel 部署，請到 Vercel 專案 Settings -> Environment Variables 確保有 <b>API_KEY</b> 並重新部署。
+                    提示：如果是 Vercel 部署，請到 Vercel 專案 Settings &rarr; Environment Variables 確保已加入 <b>API_KEY</b> 並重新部署。
                   </p>
                 </div>
               )}
@@ -252,7 +246,7 @@ const ProjectWizard: React.FC<ProjectWizardProps> = ({ templates, onCancel, onCo
                   onClick={handleStart}
                   className={`py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all shadow-xl active:scale-95 disabled:opacity-70 ${keyError ? 'bg-amber-500 text-white hover:bg-amber-600' : 'bg-stone-900 text-white hover:bg-stone-800'}`}
                 >
-                  {loading ? '正在分析內容構想...' : keyError ? '重新選取金鑰或重試' : '確認並開始生成'} 
+                  {loading ? '正在分析內容構想...' : keyError ? '點此開啟選取視窗' : '確認並開始生成'} 
                 </button>
                 <button 
                   disabled={loading}
